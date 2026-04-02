@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>La Rosa de Capítulos 🌹</title>
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.plyr.io/3.7.8/plyr.css" />
+    <style>
+        :root {
+            --color-destacado: #ffffff; 
+            --negro-fondo: #0a0a0a;
+            --gris-suave: #1e1e1e;
+            --plyr-color-main: #ffffff;
+            --naranja-accent: #e67e22;
+            /* Modificación: Color de fondo de tarjeta estilo referencia */
+            --fondo-tarjeta: #1c1511; 
+        }
+
+        body { 
+            font-family: 'Roboto', sans-serif; 
+            background: var(--negro-fondo); 
+            color: white; 
+            margin: 0; padding: 0;
+            text-align: center;
+        }
+
+        header { padding: 30px 5% 10px 5%; }
+        header h1 { 
+            color: var(--color-destacado); 
+            font-size: 2.2rem; 
+            text-transform: uppercase; 
+            line-height: 1.1; 
+            font-weight: 700;
+            margin: 0;
+        }
+
+        /* 📋 PANTALLA BIENVENIDA */
+        #vista-bienvenida { 
+            display: flex; flex-direction: column; justify-content: center; 
+            align-items: center; min-height: 60vh; padding: 20px;
+        }
+
+        /* 📋 BARRA DE TEMPORADAS (SELECT) */
+        .contenedor-selector { max-width: 700px; margin: 10px auto 20px auto; padding: 0 15px; }
+        .selector-estilo {
+            background: #1a1a1a; color: white; border: 1px solid #333;
+            padding: 15px; border-radius: 12px; width: 100%; font-weight: bold;
+            outline: none; font-size: 1rem;
+        }
+
+        /* 📱 LISTA DE EPISODIOS */
+        .lista-vertical { display: flex; flex-direction: column; gap: 20px; align-items: center; padding: 10px 20px; }
+        
+        /* Modificación 1 (CSS): Estilo de la tarjeta (fondo marrón, sombra) */
+        .btn-cap { 
+            width: 100%; max-width: 600px; 
+            background: var(--fondo-tarjeta); 
+            border: 1px solid #333; 
+            border-radius: 15px; 
+            overflow: hidden; cursor: pointer; 
+            display: flex; flex-direction: column;
+            transition: transform 0.2s;
+            position: relative; /* Para el texto absoluto */
+            box-shadow: 0 8px 25px rgba(0,0,0,0.6); /* Sombra de la tarjeta */
+        }
+        .btn-cap:active { transform: scale(0.98); }
+
+        .miniatura { width: 100%; aspect-ratio: 16/9; object-fit: cover; display: block; }
+        
+        /* Modificación 2 (CSS): Texto superpuesto con degradado */
+        .cap-info-box { 
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            width: 100%;
+            padding: 30px 15px 15px 15px; /* Más padding arriba para el degradado */
+            text-align: center; /* Título centrado como en la referencia */
+            box-sizing: border-box;
+            /* Degradado de negro transparente a negro opaco */
+            background: linear-gradient(to top, rgba(0,0,0,0.9) 0%, rgba(0,0,0,0.6) 50%, rgba(0,0,0,0) 100%);
+        }
+        .cap-text { 
+            font-size: 1rem; font-weight: bold; color: #ddd; margin: 0;
+        }
+
+        /* 🎬 REPRODUCTOR */
+        .contenedor-video { width: 100%; max-width: 900px; margin: 10px auto; background: black; border-radius: 10px; overflow: hidden; }
+        .info-reproductor { max-width: 900px; margin: 0 auto; padding: 15px 20px; text-align: left; }
+
+        /* 📱 NAV INFERIOR */
+        .nav-inferior {
+            position: fixed; bottom: 0; left: 0; width: 100%;
+            background: #0f0f0f; border-top: 1px solid #222;
+            display: flex; justify-content: space-around; padding: 10px 0; z-index: 1000;
+        }
+        .nav-item { background: none; border: none; color: #777; display: flex; flex-direction: column; align-items: center; font-size: 0.7rem; cursor: pointer; flex: 1; }
+        .nav-item.active { color: var(--naranja-accent); }
+        .nav-icon { font-size: 1.4rem; margin-bottom: 3px; }
+
+        .btn-abajo { background: #222; color: white; border: none; padding: 12px 30px; border-radius: 10px; margin: 20px 0; font-weight: bold; }
+        #vista-bienvenida, #vista-caps, #vista-buscar, #vista-reproductor { padding-bottom: 100px; }
+    </style>
+</head>
+<body>
+
+    <header id="main-header">
+        <h1>LA ROSA DE <br> CAPÍTULOS 🌹</h1>
+    </header>
+
+    <div id="vista-bienvenida" style="display:none">
+        <h2 style="font-size: 1.8rem;">Bienvenido a <br> esta página de <br> La Rosa de Capítulos ❤️</h2>
+    </div>
+
+    <div id="vista-caps" style="display:none">
+        <div class="contenedor-selector">
+            <select id="selector-temp" class="selector-estilo" onchange="navegar('temp' + this.value)">
+                <option value="1">Temporada 1</option>
+                <option value="2">Temporada 2</option>
+                <option value="3">Temporada 3</option>
+                <option value="4">Temporada 4</option>
+                <option value="5">Temporada 5</option>
+            </select>
+        </div>
+        <div id="caps" class="lista-vertical"></div>
+    </div>
+
+    <div id="vista-buscar" style="display:none">
+        <h2 style="margin-top:20px">BUSCAR</h2>
+        <input type="text" id="input-busqueda" style="width:85%; padding:15px; border-radius:30px; border:none; background:#222; color:white;" placeholder="Número de capítulo..." onkeyup="buscarGlobal(this)">
+        <div id="resultados-busqueda" class="lista-vertical"></div>
+    </div>
+
+    <div id="vista-reproductor" style="display:none">
+        <div class="contenedor-video">
+            <video id="reproductor" playsinline controls></video>
+        </div>
+        <div class="info-reproductor">
+            <p id="data-show" style="font-size: 1.3rem; font-weight: bold; margin: 0;"></p>
+            <p style="color:var(--naranja-accent); margin-top:5px;">La rosa de capítulos</p>
+        </div>
+        <button class="btn-abajo" onclick="window.history.back()">⬅ VOLVER</button>
+    </div>
+
+    <nav class="nav-inferior">
+        <button class="nav-item" id="nav-bien" onclick="navegar('bienvenida')">
+            <span class="nav-icon">❤️</span>
+            <span>Bienvenida</span>
+        </button>
+        <button class="nav-item" id="nav-epi" onclick="navegar('temp1')">
+            <span class="nav-icon">🎬</span>
+            <span>Episodios</span>
+        </button>
+        <button class="nav-item" id="nav-bus" onclick="navegar('buscar')">
+            <span class="nav-icon">🔍</span>
+            <span>Buscar</span>
+        </button>
+    </nav>
+
+    <script src="https://cdn.plyr.io/3.7.8/plyr.js"></script>
+    <script>
+        const player = new Plyr('#reproductor');
+        const db = { 1:83, 2:88, 3:109, 4:97, 5:97 };
+
+        function navegar(destino) { location.hash = destino; }
+
+        window.onhashchange = function() {
+            const h = location.hash.replace('#', '');
+            document.querySelectorAll('body > div').forEach(el => el.style.display = 'none');
+            document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
+
+            if (h === 'bienvenida' || h === '') {
+                document.getElementById('vista-bienvenida').style.display = 'flex';
+                document.getElementById('nav-bien').classList.add('active');
+            } else if (h === 'buscar') {
+                document.getElementById('vista-buscar').style.display = 'block';
+                document.getElementById('nav-bus').classList.add('active');
+            } else if (h.startsWith('temp')) {
+                const n = h.replace('temp', '');
+                document.getElementById('vista-caps').style.display = 'block';
+                document.getElementById('selector-temp').value = n;
+                cargarCaps(n);
+                document.getElementById('nav-epi').classList.add('active');
+            } else if (h.startsWith('repro')) {
+                document.getElementById('vista-reproductor').style.display = 'block';
+            }
+            player.pause();
+        };
+
+        function cargarCaps(n) {
+            const box = document.getElementById('caps');
+            box.innerHTML = '';
+            for (let i = 1; i <= db[n]; i++) {
+                if (n == 5 && i == 55) continue;
+                box.appendChild(crearBoton(n, i));
+            }
+            window.scrollTo(0,0);
+        }
+
+        function crearBoton(n, i) {
+            const tF = n.toString().padStart(2, '0');
+            const cF = (n == 3) ? i.toString().padStart(3, '0') : i.toString().padStart(2, '0');
+            const url = `https://archive.org/download/LRDG-21/Fondos/La%20Rosa%20de%20Guadalupe%20S${tF}E${cF}.png`;
+            
+            const b = document.createElement('button');
+            b.className = 'btn-cap';
+            
+            /* Modificación 3 (JavaScript): Texto solicitado: Temporada (Número) - Episodio (Número) y estructura HTML */
+            b.innerHTML = `
+                <img src="${url}" class="miniatura" loading="lazy" onerror="this.src='https://via.placeholder.com/300x169/1e1e1e/fff?text=Cargando...'">
+                <div class="cap-info-box">
+                    <p class="cap-text">Temporada ${n} - Episodio ${i}</p>
+                </div>`;
+            b.onclick = () => reproducir(n, i, tF, cF);
+            return b;
+        }
+
+        function reproducir(n, i, tF, cF) {
+            location.hash = `repro-t${n}-c${i}`;
+            player.source = { type: 'video', sources: [{ src: `https://archive.org/download/LRDG-21/Temporada%201/La%20Rosa%20de%20Guadalupe%20S${tF}E${cF}.mp4`, type: 'video/mp4' }] };
+            document.getElementById('data-show').innerText = `T${n} - Capítulo ${i}`;
+            player.play();
+        }
+
+        function buscarGlobal(input) {
+            const txt = input.value.toLowerCase();
+            const res = document.getElementById('resultados-busqueda');
+            res.innerHTML = '';
+            if (!txt) return;
+            for (let n in db) {
+                for (let i = 1; i <= db[n]; i++) {
+                    if (`temporada ${n} episodio ${i}`.includes(txt) || `${i}`.includes(txt)) {
+                        res.appendChild(crearBoton(n, i));
+                    }
+                }
+            }
+        }
+
+        window.onload = () => { if(!location.hash) navegar('bienvenida'); else window.onhashchange(); };
+    </script>
+</body>
+</html>
