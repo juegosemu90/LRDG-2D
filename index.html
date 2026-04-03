@@ -4,21 +4,32 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>La Rosa de Capítulos 🌹</title>
-    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdn.plyr.io/3.7.8/plyr.css" />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
     <style>
         :root {
             --color-destacado: #ffffff; 
             --negro-fondo: #0a0a0a;
             --gris-suave: #1e1e1e;
-            --plyr-color-main: #ffffff;
             --naranja-accent: #e67e22;
-            /* Modificación: Color de fondo de tarjeta estilo referencia */
             --fondo-tarjeta: #1c1511; 
         }
 
+        * { box-sizing: border-box; }
+
+        /* ── Evitar menú del navegador al mantener presionado ── */
+        #vista-reproductor,
+        #vista-reproductor * {
+            -webkit-user-select: none;
+            -moz-user-select: none;
+            user-select: none;
+            -webkit-touch-callout: none;
+            -webkit-tap-highlight-color: transparent; /* ← elimina cuadro azul al tocar */
+            tap-highlight-color: transparent;
+            outline: none;
+        }
+
         body { 
-            font-family: 'Roboto', sans-serif; 
+            font-family: 'Inter', sans-serif; 
             background: var(--negro-fondo); 
             color: white; 
             margin: 0; padding: 0;
@@ -35,13 +46,11 @@
             margin: 0;
         }
 
-        /* 📋 PANTALLA BIENVENIDA */
         #vista-bienvenida { 
             display: flex; flex-direction: column; justify-content: center; 
             align-items: center; min-height: 60vh; padding: 20px;
         }
 
-        /* 📋 BARRA DE TEMPORADAS (SELECT) */
         .contenedor-selector { max-width: 700px; margin: 10px auto 20px auto; padding: 0 15px; }
         .selector-estilo {
             background: #1a1a1a; color: white; border: 1px solid #333;
@@ -49,10 +58,8 @@
             outline: none; font-size: 1rem;
         }
 
-        /* 📱 LISTA DE EPISODIOS */
         .lista-vertical { display: flex; flex-direction: column; gap: 20px; align-items: center; padding: 10px 20px; }
         
-        /* Modificación 1 (CSS): Estilo de la tarjeta (fondo marrón, sombra) */
         .btn-cap { 
             width: 100%; max-width: 600px; 
             background: var(--fondo-tarjeta); 
@@ -61,34 +68,270 @@
             overflow: hidden; cursor: pointer; 
             display: flex; flex-direction: column;
             transition: transform 0.2s;
-            position: relative; /* Para el texto absoluto */
-            box-shadow: 0 8px 25px rgba(0,0,0,0.6); /* Sombra de la tarjeta */
+            position: relative;
+            box-shadow: 0 8px 25px rgba(0,0,0,0.6);
         }
         .btn-cap:active { transform: scale(0.98); }
-
         .miniatura { width: 100%; aspect-ratio: 16/9; object-fit: cover; display: block; }
         
-        /* Modificación 2 (CSS): Texto superpuesto con degradado */
         .cap-info-box { 
-            position: absolute;
-            bottom: 0;
-            left: 0;
-            width: 100%;
-            padding: 30px 15px 15px 15px; /* Más padding arriba para el degradado */
-            text-align: center; /* Título centrado como en la referencia */
-            box-sizing: border-box;
-            /* Degradado de negro transparente a negro opaco */
+            position: absolute; bottom: 0; left: 0; width: 100%;
+            padding: 30px 15px 15px 15px; text-align: center; box-sizing: border-box;
             background: linear-gradient(to top, rgba(0,0,0,0.9) 0%, rgba(0,0,0,0.6) 50%, rgba(0,0,0,0) 100%);
         }
-        .cap-text { 
-            font-size: 1rem; font-weight: bold; color: #ddd; margin: 0;
+        .cap-text { font-size: 1rem; font-weight: bold; color: #ddd; margin: 0; }
+
+        /* ===================== */
+        /* 🎬 REPRODUCTOR CUSTOM */
+        /* ===================== */
+        #vista-reproductor {
+            display: none;
+            position: fixed;
+            top: 0; left: 0;
+            width: 100vw;
+            height: 100dvh;
+            background: #000;
+            z-index: 9999;
+            overflow: hidden;
         }
 
-        /* 🎬 REPRODUCTOR */
-        .contenedor-video { width: 100%; max-width: 900px; margin: 10px auto; background: black; border-radius: 10px; overflow: hidden; }
-        .info-reproductor { max-width: 900px; margin: 0 auto; padding: 15px 20px; text-align: left; }
+        /* Zona del video: ocupa TODO absolutamente */
+        #video-wrapper {
+            position: absolute;
+            inset: 0;
+            width: 100%;
+            height: 100%;
+            background: #000;
+            cursor: pointer;
+            overflow: hidden;
+            touch-action: manipulation; /* permite toques, bloquea zoom con dos dedos */
+        }
 
-        /* 📱 NAV INFERIOR */
+        #mi-video {
+            position: absolute;
+            inset: 0;
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+            display: block;
+            transition: transform 0.3s;
+        }
+        /* Modo normal: respeta proporciones */
+        #mi-video.modo-normal   { object-fit: contain; transform: none; }
+        /* Modo fill: estira para llenar sin zoom */
+        #mi-video.modo-fill     { object-fit: fill;    transform: none; }
+        /* Modo zoom 16:9: recorta para llenar */
+        #mi-video.modo-zoom169  { object-fit: cover;   transform: none; }
+        /* Modo zoom 16:10: pequeño zoom extra */
+        #mi-video.modo-zoom1610 { object-fit: cover;   transform: scaleX(1.125); }
+
+        /* Badge de modo flotante */
+        #badge-modo {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(0,0,0,0.72);
+            color: white;
+            font-size: 0.85rem;
+            font-weight: 600;
+            padding: 8px 18px;
+            border-radius: 20px;
+            pointer-events: none;
+            opacity: 0;
+            transition: opacity 0.3s;
+            letter-spacing: 0.04em;
+            white-space: nowrap;
+        }
+        #badge-modo.visible { opacity: 1; }
+
+        /* Overlay de controles: cubre todo el wrapper */
+        #overlay-controles {
+            position: absolute;
+            inset: 0;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            opacity: 1;
+            transition: opacity 0.4s ease;
+            /* Asegura que no interfiere con toques cuando oculto */
+        }
+        #overlay-controles.oculto {
+            opacity: 0;
+            pointer-events: none;
+        }
+
+        /* --- CABECERA del reproductor --- */
+        .player-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            padding: 8px 28px 80px 28px;
+            background: linear-gradient(to bottom, rgba(0,0,0,0.9) 0%, transparent 100%);
+        }
+
+        .player-title-left {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            cursor: pointer;
+        }
+
+        .player-back-arrow {
+            font-size: 2.2rem;
+            color: rgba(255,255,255,0.9);
+            font-weight: 300;
+            line-height: 1;
+        }
+
+        .player-show-name {
+            font-size: 1.4rem;
+            font-weight: 400;
+            color: rgba(255,255,255,0.9);
+            letter-spacing: 0.01em;
+        }
+
+        .player-episode-num {
+            font-size: 1.3rem;
+            font-weight: 400;
+            color: rgba(255,255,255,0.7);
+            letter-spacing: 0.01em;
+            text-align: right;
+            max-width: 200px;
+            line-height: 1.3;
+        }
+
+        /* --- PIE del reproductor --- */
+        .player-footer {
+            padding: 40px 22px 18px 22px;
+            background: linear-gradient(to top, rgba(0,0,0,0.75) 0%, transparent 100%);
+        }
+
+        /* Barra de progreso */
+        .progress-row {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 16px;
+        }
+
+        .time-label {
+            font-size: 0.78rem;
+            font-weight: 400;
+            color: rgba(255,255,255,0.7);
+            min-width: 46px;
+            font-variant-numeric: tabular-nums;
+        }
+        .time-label.end { text-align: right; }
+
+        .progress-track {
+            flex: 1;
+            position: relative;
+            height: 20px;
+            cursor: pointer;
+            touch-action: pan-x;
+        }
+        /* Línea base gris, igual que la imagen */
+        .progress-track::before {
+            content: '';
+            position: absolute;
+            left: 0; right: 0;
+            top: 50%; transform: translateY(-50%);
+            height: 2px;
+            background: rgba(255,255,255,0.35);
+            border-radius: 99px;
+        }
+        /* Parte reproducida en azul */
+        .progress-fill {
+            position: absolute;
+            left: 0;
+            top: 50%;
+            transform: translateY(-50%);
+            height: 2px;
+            background: #4A9EFF;
+            border-radius: 99px;
+            width: 0%;
+            transition: width 0.3s linear;
+            pointer-events: none;
+        }
+        /* Puntito gris encima */
+        .progress-thumb {
+            position: absolute;
+            left: 0%;
+            top: 50%;
+            transform: translate(-50%, -50%);
+            width: 11px;
+            height: 11px;
+            background: #c0c0c0;
+            border-radius: 50%;
+            pointer-events: none;
+            transition: left 0.3s linear;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.4);
+        }
+
+        /* Fila de botones */
+        .controls-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .controls-left {
+            display: flex;
+            align-items: center;
+            gap: 22px;
+        }
+
+        .ctrl-btn {
+            background: none;
+            border: none;
+            color: white;
+            cursor: pointer;
+            padding: 8px;           /* área táctil más grande */
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            opacity: 0.9;
+            transition: opacity 0.2s, transform 0.15s;
+            -webkit-tap-highlight-color: transparent;
+            touch-action: manipulation; /* evita doble tap zoom del navegador */
+            -webkit-user-select: none;
+            user-select: none;
+            -webkit-touch-callout: none;
+            outline: none;
+        }
+        .ctrl-btn:active { transform: scale(0.88); opacity: 0.7; }
+
+        /* Ícono play/pause SVG */
+        .ctrl-btn svg { width: 28px; height: 28px; fill: white; }
+        .ctrl-btn.small svg { width: 24px; height: 24px; }
+        .ctrl-btn.xs svg { width: 20px; height: 20px; }
+
+        /* Botón de segundos (rewind/forward) */
+        .skip-btn {
+            position: relative;
+            width: 38px;
+            height: 38px;
+        }
+        .skip-btn svg { width: 38px; height: 38px; }
+        .skip-label {
+            position: absolute;
+            bottom: 4px;
+            left: 50%;
+            transform: translateX(-50%);
+            font-size: 0.58rem;
+            font-weight: 600;
+            color: white;
+            letter-spacing: 0;
+            line-height: 1;
+        }
+
+        /* Pantalla completa (derecha) */
+        .controls-right { }
+
+        /* Nav inferior */
         .nav-inferior {
             position: fixed; bottom: 0; left: 0; width: 100%;
             background: #0f0f0f; border-top: 1px solid #222;
@@ -98,8 +341,7 @@
         .nav-item.active { color: var(--naranja-accent); }
         .nav-icon { font-size: 1.4rem; margin-bottom: 3px; }
 
-        .btn-abajo { background: #222; color: white; border: none; padding: 12px 30px; border-radius: 10px; margin: 20px 0; font-weight: bold; }
-        #vista-bienvenida, #vista-caps, #vista-buscar, #vista-reproductor { padding-bottom: 100px; }
+        #vista-bienvenida, #vista-caps, #vista-buscar { padding-bottom: 100px; }
     </style>
 </head>
 <body>
@@ -131,18 +373,89 @@
         <div id="resultados-busqueda" class="lista-vertical"></div>
     </div>
 
-    <div id="vista-reproductor" style="display:none">
-        <div class="contenedor-video">
-            <video id="reproductor" playsinline controls></video>
+    <!-- REPRODUCTOR CUSTOM FULLSCREEN -->
+    <div id="vista-reproductor">
+        <div id="video-wrapper">
+            <video id="mi-video" class="modo-normal" playsinline></video>
+            <div id="badge-modo"></div>
+
+            <div id="overlay-controles">
+                <!-- CABECERA -->
+                <div class="player-header">
+                    <div class="player-title-left" onclick="cerrarReproductor(event)">
+                        <span class="player-back-arrow">&#8249;</span>
+                        <span class="player-show-name" id="player-nombre">La Rosa de Guadalupe</span>
+                    </div>
+                    <span class="player-episode-num" id="player-episodio">Episodio 1</span>
+                </div>
+
+                <!-- PIE -->
+                <div class="player-footer">
+                    <!-- Barra de progreso -->
+                    <div class="progress-row">
+                        <span class="time-label" id="tiempo-actual">00:00:00</span>
+                        <div class="progress-track" id="progress-track" onclick="seekVideo(event)">
+                            <div class="progress-fill" id="progress-fill"></div>
+                            <div class="progress-thumb" id="progress-thumb"></div>
+                        </div>
+                        <span class="time-label end" id="tiempo-total">00:00:00</span>
+                    </div>
+
+                    <!-- Botones -->
+                    <div class="controls-row">
+                        <div class="controls-left">
+                            <!-- Play/Pause -->
+                            <button class="ctrl-btn" id="btn-playpause" onclick="togglePlay(event)">
+                                <svg id="icono-play" viewBox="0 0 24 24"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>
+                            </button>
+
+                            <!-- Subtítulos / pantalla en pantalla -->
+                            <button class="ctrl-btn small" onclick="togglePiP(event)">
+                                <svg viewBox="0 0 24 24"><path d="M19 7H5c-1.1 0-2 .9-2 2v6c0 1.1.9 2 2 2h4v-2H5V9h14v2h2V9c0-1.1-.9-2-2-2zm0 8h-6c-.55 0-1 .45-1 1v3c0 .55.45 1 1 1h6c.55 0 1-.45 1-1v-3c0-.55-.45-1-1-1z"/></svg>
+                            </button>
+
+                            <!-- Retroceder 15s -->
+                            <button class="ctrl-btn skip-btn" onclick="skipVideo(-15, event)">
+                                <svg viewBox="0 0 24 24" fill="white">
+                                    <path d="M12 5V1L7 6l5 5V7c3.31 0 6 2.69 6 6s-2.69 6-6 6-6-2.69-6-6H4c0 4.42 3.58 8 8 8s8-3.58 8-8-3.58-8-8-8z"/>
+                                </svg>
+                                <span class="skip-label">15</span>
+                            </button>
+
+                            <!-- Avanzar 15s -->
+                            <button class="ctrl-btn skip-btn" onclick="skipVideo(15, event)">
+                                <svg viewBox="0 0 24 24" fill="white">
+                                    <path d="M12 5V1l5 5-5 5V7c-3.31 0-6 2.69-6 6s2.69 6 6 6 6-2.69 6-6h2c0 4.42-3.58 8-8 8s-8-3.58-8-8 3.58-8 8-8z"/>
+                                </svg>
+                                <span class="skip-label">15</span>
+                            </button>
+
+                            <!-- Volumen -->
+                            <button class="ctrl-btn xs" id="btn-volumen" onclick="toggleMute(event)">
+                                <svg id="icono-vol" viewBox="0 0 24 24"><path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"/></svg>
+                            </button>
+                        </div>
+
+                        <!-- Pantalla completa + Aspecto -->
+                        <div class="controls-right" style="display:flex;align-items:center;gap:14px;">
+                            <!-- Botón de modo de aspecto -->
+                            <button class="ctrl-btn xs" id="btn-aspecto" onclick="ciclarAspecto(event)" title="Cambiar aspecto">
+                                <svg id="icono-aspecto" viewBox="0 0 24 24" fill="white">
+                                    <path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 16H5V5h14v14z"/>
+                                    <path d="M7 12h2v2H7zm0-3h2v2H7zm3 3h2v2h-2zm0-3h2v2h-2zm3 3h2v2h-2zm0-3h2v2h-2z"/>
+                                </svg>
+                            </button>
+                            <button class="ctrl-btn xs" onclick="toggleFullscreen(event)">
+                                <svg id="icono-fs" viewBox="0 0 24 24"><path d="M7 14H5v5h5v-2H7v-3zm-2-4h2V7h3V5H5v5zm12 7h-3v2h5v-5h-2v3zM14 5v2h3v3h2V5h-5z"/></svg>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
         </div>
-        <div class="info-reproductor">
-            <p id="data-show" style="font-size: 1.3rem; font-weight: bold; margin: 0;"></p>
-            <p style="color:var(--naranja-accent); margin-top:5px;">La rosa de capítulos</p>
-        </div>
-        <button class="btn-abajo" onclick="window.history.back()">⬅ VOLVER</button>
     </div>
 
-    <nav class="nav-inferior">
+    <nav class="nav-inferior" id="nav-bar">
         <button class="nav-item" id="nav-bien" onclick="navegar('bienvenida')">
             <span class="nav-icon">❤️</span>
             <span>Bienvenida</span>
@@ -157,86 +470,50 @@
         </button>
     </nav>
 
-    <script src="https://cdn.plyr.io/3.7.8/plyr.js"></script>
     <script>
-        const player = new Plyr('#reproductor');
         const db = { 1:83, 2:88, 3:109, 4:97, 5:97 };
+        const video = document.getElementById('mi-video');
+        let overlayTimeout = null;
+        let isFullscreen = false;
 
+        /* Modos de aspecto */
+        const modos = [
+            { clase: 'modo-normal',   label: '⬜ Normal' },
+            { clase: 'modo-zoom169',  label: '▬ Zoom 16:9' },
+            { clase: 'modo-zoom1610', label: '▬ Zoom 16:10' },
+            { clase: 'modo-fill',     label: '⬛ Estirar' },
+        ];
+        let modoActual = 0;
+
+        function ciclarAspecto(e) {
+            e.stopPropagation();
+            modos.forEach(m => video.classList.remove(m.clase));
+            modoActual = (modoActual + 1) % modos.length;
+            const m = modos[modoActual];
+            video.classList.add(m.clase);
+            mostrarBadge(m.label);
+            autoHideOverlay();
+        }
+
+        let badgeTimeout = null;
+        function mostrarBadge(txt) {
+            const badge = document.getElementById('badge-modo');
+            badge.textContent = txt;
+            badge.classList.add('visible');
+            clearTimeout(badgeTimeout);
+            badgeTimeout = setTimeout(() => badge.classList.remove('visible'), 1800);
+        }
+
+        /* ===================== */
+        /* NAVEGACIÓN            */
+        /* ===================== */
         function navegar(destino) { location.hash = destino; }
 
         window.onhashchange = function() {
             const h = location.hash.replace('#', '');
             document.querySelectorAll('body > div').forEach(el => el.style.display = 'none');
             document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
+            document.getElementById('nav-bar').style.display = 'flex';
 
             if (h === 'bienvenida' || h === '') {
-                document.getElementById('vista-bienvenida').style.display = 'flex';
-                document.getElementById('nav-bien').classList.add('active');
-            } else if (h === 'buscar') {
-                document.getElementById('vista-buscar').style.display = 'block';
-                document.getElementById('nav-bus').classList.add('active');
-            } else if (h.startsWith('temp')) {
-                const n = h.replace('temp', '');
-                document.getElementById('vista-caps').style.display = 'block';
-                document.getElementById('selector-temp').value = n;
-                cargarCaps(n);
-                document.getElementById('nav-epi').classList.add('active');
-            } else if (h.startsWith('repro')) {
-                document.getElementById('vista-reproductor').style.display = 'block';
-            }
-            player.pause();
-        };
-
-        function cargarCaps(n) {
-            const box = document.getElementById('caps');
-            box.innerHTML = '';
-            for (let i = 1; i <= db[n]; i++) {
-                if (n == 5 && i == 55) continue;
-                box.appendChild(crearBoton(n, i));
-            }
-            window.scrollTo(0,0);
-        }
-
-        function crearBoton(n, i) {
-            const tF = n.toString().padStart(2, '0');
-            const cF = (n == 3) ? i.toString().padStart(3, '0') : i.toString().padStart(2, '0');
-            const url = `https://archive.org/download/LRDG-21/Fondos/La%20Rosa%20de%20Guadalupe%20S${tF}E${cF}.png`;
-            
-            const b = document.createElement('button');
-            b.className = 'btn-cap';
-            
-            /* Modificación 3 (JavaScript): Texto solicitado: Temporada (Número) - Episodio (Número) y estructura HTML */
-            b.innerHTML = `
-                <img src="${url}" class="miniatura" loading="lazy" onerror="this.src='https://via.placeholder.com/300x169/1e1e1e/fff?text=Cargando...'">
-                <div class="cap-info-box">
-                    <p class="cap-text">Temporada ${n} - Episodio ${i}</p>
-                </div>`;
-            b.onclick = () => reproducir(n, i, tF, cF);
-            return b;
-        }
-
-        function reproducir(n, i, tF, cF) {
-            location.hash = `repro-t${n}-c${i}`;
-            player.source = { type: 'video', sources: [{ src: `https://archive.org/download/LRDG-21/Temporada%201/La%20Rosa%20de%20Guadalupe%20S${tF}E${cF}.mp4`, type: 'video/mp4' }] };
-            document.getElementById('data-show').innerText = `T${n} - Capítulo ${i}`;
-            player.play();
-        }
-
-        function buscarGlobal(input) {
-            const txt = input.value.toLowerCase();
-            const res = document.getElementById('resultados-busqueda');
-            res.innerHTML = '';
-            if (!txt) return;
-            for (let n in db) {
-                for (let i = 1; i <= db[n]; i++) {
-                    if (`temporada ${n} episodio ${i}`.includes(txt) || `${i}`.includes(txt)) {
-                        res.appendChild(crearBoton(n, i));
-                    }
-                }
-            }
-        }
-
-        window.onload = () => { if(!location.hash) navegar('bienvenida'); else window.onhashchange(); };
-    </script>
-</body>
-</html>
+                document.getElementById('vista-bienvenida').style.displ
