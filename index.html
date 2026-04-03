@@ -1,0 +1,826 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>La Rosa de Capítulos 🌹</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --color-destacado: #ffffff; 
+            --negro-fondo: #0a0a0a;
+            --gris-suave: #1e1e1e;
+            --naranja-accent: #e67e22;
+            --fondo-tarjeta: #1c1511; 
+        }
+
+        * { box-sizing: border-box; }
+
+        /* ── Evitar menú del navegador al mantener presionado ── */
+        #vista-reproductor,
+        #vista-reproductor * {
+            -webkit-user-select: none;
+            -moz-user-select: none;
+            user-select: none;
+            -webkit-touch-callout: none;
+            -webkit-tap-highlight-color: transparent; /* ← elimina cuadro azul al tocar */
+            tap-highlight-color: transparent;
+            outline: none;
+        }
+
+        body { 
+            font-family: 'Inter', sans-serif; 
+            background: var(--negro-fondo); 
+            color: white; 
+            margin: 0; padding: 0;
+            text-align: center;
+        }
+
+        header { padding: 30px 5% 10px 5%; }
+        header h1 { 
+            color: var(--color-destacado); 
+            font-size: 2.2rem; 
+            text-transform: uppercase; 
+            line-height: 1.1; 
+            font-weight: 700;
+            margin: 0;
+        }
+
+        #vista-bienvenida { 
+            display: flex; flex-direction: column; justify-content: center; 
+            align-items: center; min-height: 60vh; padding: 20px;
+        }
+
+        .contenedor-selector { max-width: 700px; margin: 10px auto 20px auto; padding: 0 15px; }
+        .selector-estilo {
+            background: #1a1a1a; color: white; border: 1px solid #333;
+            padding: 15px; border-radius: 12px; width: 100%; font-weight: bold;
+            outline: none; font-size: 1rem;
+        }
+
+        .lista-vertical { display: flex; flex-direction: column; gap: 20px; align-items: center; padding: 10px 20px; }
+        
+        .btn-cap { 
+            width: 100%; max-width: 600px; 
+            background: var(--fondo-tarjeta); 
+            border: 1px solid #333; 
+            border-radius: 15px; 
+            overflow: hidden; cursor: pointer; 
+            display: flex; flex-direction: column;
+            transition: transform 0.2s;
+            position: relative;
+            box-shadow: 0 8px 25px rgba(0,0,0,0.6);
+        }
+        .btn-cap:active { transform: scale(0.98); }
+        .miniatura { width: 100%; aspect-ratio: 16/9; object-fit: cover; display: block; }
+        
+        .cap-info-box { 
+            position: absolute; bottom: 0; left: 0; width: 100%;
+            padding: 30px 15px 15px 15px; text-align: center; box-sizing: border-box;
+            background: linear-gradient(to top, rgba(0,0,0,0.9) 0%, rgba(0,0,0,0.6) 50%, rgba(0,0,0,0) 100%);
+        }
+        .cap-text { font-size: 1rem; font-weight: bold; color: #ddd; margin: 0; }
+
+        /* ===================== */
+        /* 🎬 REPRODUCTOR CUSTOM */
+        /* ===================== */
+        #vista-reproductor {
+            display: none;
+            position: fixed;
+            top: 0; left: 0;
+            width: 100vw;
+            height: 100dvh;
+            background: #000;
+            z-index: 9999;
+            overflow: hidden;
+        }
+
+        /* Zona del video: ocupa TODO absolutamente */
+        #video-wrapper {
+            position: absolute;
+            inset: 0;
+            width: 100%;
+            height: 100%;
+            background: #000;
+            cursor: pointer;
+            overflow: hidden;
+            touch-action: manipulation; /* permite toques, bloquea zoom con dos dedos */
+        }
+
+        #mi-video {
+            position: absolute;
+            inset: 0;
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+            display: block;
+            transition: transform 0.3s;
+        }
+        /* Modo normal: respeta proporciones */
+        #mi-video.modo-normal   { object-fit: contain; transform: none; }
+        /* Modo fill: estira para llenar sin zoom */
+        #mi-video.modo-fill     { object-fit: fill;    transform: none; }
+        /* Modo zoom 16:9: recorta para llenar */
+        #mi-video.modo-zoom169  { object-fit: cover;   transform: none; }
+        /* Modo zoom 16:10: pequeño zoom extra */
+        #mi-video.modo-zoom1610 { object-fit: cover;   transform: scaleX(1.125); }
+
+        /* Badge de modo flotante */
+        #badge-modo {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(0,0,0,0.72);
+            color: white;
+            font-size: 0.85rem;
+            font-weight: 600;
+            padding: 8px 18px;
+            border-radius: 20px;
+            pointer-events: none;
+            opacity: 0;
+            transition: opacity 0.3s;
+            letter-spacing: 0.04em;
+            white-space: nowrap;
+        }
+        #badge-modo.visible { opacity: 1; }
+
+        /* Overlay de controles: cubre todo el wrapper */
+        #overlay-controles {
+            position: absolute;
+            inset: 0;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            opacity: 1;
+            transition: opacity 0.4s ease;
+            /* Asegura que no interfiere con toques cuando oculto */
+        }
+        #overlay-controles.oculto {
+            opacity: 0;
+            pointer-events: none;
+        }
+
+        /* --- CABECERA del reproductor --- */
+        .player-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            padding: 8px 28px 80px 28px;
+            background: linear-gradient(to bottom, rgba(0,0,0,0.9) 0%, transparent 100%);
+        }
+
+        .player-title-left {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            cursor: pointer;
+        }
+
+        .player-back-arrow {
+            font-size: 2.2rem;
+            color: rgba(255,255,255,0.9);
+            font-weight: 300;
+            line-height: 1;
+        }
+
+        .player-show-name {
+            font-size: 1.4rem;
+            font-weight: 400;
+            color: rgba(255,255,255,0.9);
+            letter-spacing: 0.01em;
+        }
+
+        .player-episode-num {
+            font-size: 1.3rem;
+            font-weight: 400;
+            color: rgba(255,255,255,0.7);
+            letter-spacing: 0.01em;
+            text-align: right;
+            max-width: 200px;
+            line-height: 1.3;
+        }
+
+        /* --- PIE del reproductor --- */
+        .player-footer {
+            padding: 40px 22px 18px 22px;
+            background: linear-gradient(to top, rgba(0,0,0,0.75) 0%, transparent 100%);
+        }
+
+        /* Barra de progreso */
+        .progress-row {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 16px;
+        }
+
+        .time-label {
+            font-size: 0.78rem;
+            font-weight: 400;
+            color: rgba(255,255,255,0.7);
+            min-width: 46px;
+            font-variant-numeric: tabular-nums;
+        }
+        .time-label.end { text-align: right; }
+
+        .progress-track {
+            flex: 1;
+            position: relative;
+            height: 20px;
+            cursor: pointer;
+            touch-action: pan-x;
+        }
+        /* Línea base gris, igual que la imagen */
+        .progress-track::before {
+            content: '';
+            position: absolute;
+            left: 0; right: 0;
+            top: 50%; transform: translateY(-50%);
+            height: 2px;
+            background: rgba(255,255,255,0.35);
+            border-radius: 99px;
+        }
+        /* Parte reproducida en azul */
+        .progress-fill {
+            position: absolute;
+            left: 0;
+            top: 50%;
+            transform: translateY(-50%);
+            height: 2px;
+            background: #4A9EFF;
+            border-radius: 99px;
+            width: 0%;
+            transition: width 0.3s linear;
+            pointer-events: none;
+        }
+        /* Puntito gris encima */
+        .progress-thumb {
+            position: absolute;
+            left: 0%;
+            top: 50%;
+            transform: translate(-50%, -50%);
+            width: 11px;
+            height: 11px;
+            background: #c0c0c0;
+            border-radius: 50%;
+            pointer-events: none;
+            transition: left 0.3s linear;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.4);
+        }
+
+        /* Fila de botones */
+        .controls-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .controls-left {
+            display: flex;
+            align-items: center;
+            gap: 22px;
+        }
+
+        .ctrl-btn {
+            background: none;
+            border: none;
+            color: white;
+            cursor: pointer;
+            padding: 8px;           /* área táctil más grande */
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            opacity: 0.9;
+            transition: opacity 0.2s, transform 0.15s;
+            -webkit-tap-highlight-color: transparent;
+            touch-action: manipulation; /* evita doble tap zoom del navegador */
+            -webkit-user-select: none;
+            user-select: none;
+            -webkit-touch-callout: none;
+            outline: none;
+        }
+        .ctrl-btn:active { transform: scale(0.88); opacity: 0.7; }
+
+        /* Ícono play/pause SVG */
+        .ctrl-btn svg { width: 28px; height: 28px; fill: white; }
+        .ctrl-btn.small svg { width: 24px; height: 24px; }
+        .ctrl-btn.xs svg { width: 20px; height: 20px; }
+
+        /* Botón de segundos (rewind/forward) */
+        .skip-btn {
+            position: relative;
+            width: 38px;
+            height: 38px;
+        }
+        .skip-btn svg { width: 38px; height: 38px; }
+        .skip-label {
+            position: absolute;
+            bottom: 4px;
+            left: 50%;
+            transform: translateX(-50%);
+            font-size: 0.58rem;
+            font-weight: 600;
+            color: white;
+            letter-spacing: 0;
+            line-height: 1;
+        }
+
+        /* Pantalla completa (derecha) */
+        .controls-right { }
+
+        /* Nav inferior */
+        .nav-inferior {
+            position: fixed; bottom: 0; left: 0; width: 100%;
+            background: #0f0f0f; border-top: 1px solid #222;
+            display: flex; justify-content: space-around; padding: 10px 0; z-index: 1000;
+        }
+        .nav-item { background: none; border: none; color: #777; display: flex; flex-direction: column; align-items: center; font-size: 0.7rem; cursor: pointer; flex: 1; }
+        .nav-item.active { color: var(--naranja-accent); }
+        .nav-icon { font-size: 1.4rem; margin-bottom: 3px; }
+
+        #vista-bienvenida, #vista-caps, #vista-buscar { padding-bottom: 100px; }
+    </style>
+</head>
+<body>
+
+    <header id="main-header">
+        <h1>LA ROSA DE <br> CAPÍTULOS 🌹</h1>
+    </header>
+
+    <div id="vista-bienvenida" style="display:none">
+        <h2 style="font-size: 1.8rem;">Bienvenido a <br> esta página de <br> La Rosa de Capítulos ❤️</h2>
+    </div>
+
+    <div id="vista-caps" style="display:none">
+        <div class="contenedor-selector">
+            <select id="selector-temp" class="selector-estilo" onchange="navegar('temp' + this.value)">
+                <option value="1">Temporada 1</option>
+                <option value="2">Temporada 2</option>
+                <option value="3">Temporada 3</option>
+                <option value="4">Temporada 4</option>
+                <option value="5">Temporada 5</option>
+            </select>
+        </div>
+        <div id="caps" class="lista-vertical"></div>
+    </div>
+
+    <div id="vista-buscar" style="display:none">
+        <h2 style="margin-top:20px">BUSCAR</h2>
+        <input type="text" id="input-busqueda" style="width:85%; padding:15px; border-radius:30px; border:none; background:#222; color:white;" placeholder="Número de capítulo..." onkeyup="buscarGlobal(this)">
+        <div id="resultados-busqueda" class="lista-vertical"></div>
+    </div>
+
+    <!-- REPRODUCTOR CUSTOM FULLSCREEN -->
+    <div id="vista-reproductor">
+        <div id="video-wrapper">
+            <video id="mi-video" class="modo-normal" playsinline></video>
+            <div id="badge-modo"></div>
+
+            <div id="overlay-controles">
+                <!-- CABECERA -->
+                <div class="player-header">
+                    <div class="player-title-left" onclick="cerrarReproductor(event)">
+                        <span class="player-back-arrow">&#8249;</span>
+                        <span class="player-show-name" id="player-nombre">La Rosa de Guadalupe</span>
+                    </div>
+                    <span class="player-episode-num" id="player-episodio">Episodio 1</span>
+                </div>
+
+                <!-- PIE -->
+                <div class="player-footer">
+                    <!-- Barra de progreso -->
+                    <div class="progress-row">
+                        <span class="time-label" id="tiempo-actual">00:00:00</span>
+                        <div class="progress-track" id="progress-track" onclick="seekVideo(event)">
+                            <div class="progress-fill" id="progress-fill"></div>
+                            <div class="progress-thumb" id="progress-thumb"></div>
+                        </div>
+                        <span class="time-label end" id="tiempo-total">00:00:00</span>
+                    </div>
+
+                    <!-- Botones -->
+                    <div class="controls-row">
+                        <div class="controls-left">
+                            <!-- Play/Pause -->
+                            <button class="ctrl-btn" id="btn-playpause" onclick="togglePlay(event)">
+                                <svg id="icono-play" viewBox="0 0 24 24"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>
+                            </button>
+
+                            <!-- Subtítulos / pantalla en pantalla -->
+                            <button class="ctrl-btn small" onclick="togglePiP(event)">
+                                <svg viewBox="0 0 24 24"><path d="M19 7H5c-1.1 0-2 .9-2 2v6c0 1.1.9 2 2 2h4v-2H5V9h14v2h2V9c0-1.1-.9-2-2-2zm0 8h-6c-.55 0-1 .45-1 1v3c0 .55.45 1 1 1h6c.55 0 1-.45 1-1v-3c0-.55-.45-1-1-1z"/></svg>
+                            </button>
+
+                            <!-- Retroceder 15s -->
+                            <button class="ctrl-btn skip-btn" onclick="skipVideo(-15, event)">
+                                <svg viewBox="0 0 24 24" fill="white">
+                                    <path d="M12 5V1L7 6l5 5V7c3.31 0 6 2.69 6 6s-2.69 6-6 6-6-2.69-6-6H4c0 4.42 3.58 8 8 8s8-3.58 8-8-3.58-8-8-8z"/>
+                                </svg>
+                                <span class="skip-label">15</span>
+                            </button>
+
+                            <!-- Avanzar 15s -->
+                            <button class="ctrl-btn skip-btn" onclick="skipVideo(15, event)">
+                                <svg viewBox="0 0 24 24" fill="white">
+                                    <path d="M12 5V1l5 5-5 5V7c-3.31 0-6 2.69-6 6s2.69 6 6 6 6-2.69 6-6h2c0 4.42-3.58 8-8 8s-8-3.58-8-8 3.58-8 8-8z"/>
+                                </svg>
+                                <span class="skip-label">15</span>
+                            </button>
+
+                            <!-- Volumen -->
+                            <button class="ctrl-btn xs" id="btn-volumen" onclick="toggleMute(event)">
+                                <svg id="icono-vol" viewBox="0 0 24 24"><path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"/></svg>
+                            </button>
+                        </div>
+
+                        <!-- Pantalla completa + Aspecto -->
+                        <div class="controls-right" style="display:flex;align-items:center;gap:14px;">
+                            <!-- Botón de modo de aspecto -->
+                            <button class="ctrl-btn xs" id="btn-aspecto" onclick="ciclarAspecto(event)" title="Cambiar aspecto">
+                                <svg id="icono-aspecto" viewBox="0 0 24 24" fill="white">
+                                    <path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 16H5V5h14v14z"/>
+                                    <path d="M7 12h2v2H7zm0-3h2v2H7zm3 3h2v2h-2zm0-3h2v2h-2zm3 3h2v2h-2zm0-3h2v2h-2z"/>
+                                </svg>
+                            </button>
+                            <button class="ctrl-btn xs" onclick="toggleFullscreen(event)">
+                                <svg id="icono-fs" viewBox="0 0 24 24"><path d="M7 14H5v5h5v-2H7v-3zm-2-4h2V7h3V5H5v5zm12 7h-3v2h5v-5h-2v3zM14 5v2h3v3h2V5h-5z"/></svg>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <nav class="nav-inferior" id="nav-bar">
+        <button class="nav-item" id="nav-bien" onclick="navegar('bienvenida')">
+            <span class="nav-icon">❤️</span>
+            <span>Bienvenida</span>
+        </button>
+        <button class="nav-item" id="nav-epi" onclick="navegar('temp1')">
+            <span class="nav-icon">🎬</span>
+            <span>Episodios</span>
+        </button>
+        <button class="nav-item" id="nav-bus" onclick="navegar('buscar')">
+            <span class="nav-icon">🔍</span>
+            <span>Buscar</span>
+        </button>
+    </nav>
+
+    <script>
+        const db = { 1:83, 2:88, 3:109, 4:97, 5:97 };
+        const video = document.getElementById('mi-video');
+        let overlayTimeout = null;
+        let isFullscreen = false;
+
+        /* Modos de aspecto */
+        const modos = [
+            { clase: 'modo-normal',   label: '⬜ Normal' },
+            { clase: 'modo-zoom169',  label: '▬ Zoom 16:9' },
+            { clase: 'modo-zoom1610', label: '▬ Zoom 16:10' },
+            { clase: 'modo-fill',     label: '⬛ Estirar' },
+        ];
+        let modoActual = 0;
+
+        function ciclarAspecto(e) {
+            e.stopPropagation();
+            modos.forEach(m => video.classList.remove(m.clase));
+            modoActual = (modoActual + 1) % modos.length;
+            const m = modos[modoActual];
+            video.classList.add(m.clase);
+            mostrarBadge(m.label);
+            autoHideOverlay();
+        }
+
+        let badgeTimeout = null;
+        function mostrarBadge(txt) {
+            const badge = document.getElementById('badge-modo');
+            badge.textContent = txt;
+            badge.classList.add('visible');
+            clearTimeout(badgeTimeout);
+            badgeTimeout = setTimeout(() => badge.classList.remove('visible'), 1800);
+        }
+
+        /* ===================== */
+        /* NAVEGACIÓN            */
+        /* ===================== */
+        function navegar(destino) { location.hash = destino; }
+
+        window.onhashchange = function() {
+            const h = location.hash.replace('#', '');
+            document.querySelectorAll('body > div').forEach(el => el.style.display = 'none');
+            document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
+            document.getElementById('nav-bar').style.display = 'flex';
+
+            if (h === 'bienvenida' || h === '') {
+                document.getElementById('vista-bienvenida').style.display = 'flex';
+                document.getElementById('nav-bien').classList.add('active');
+            } else if (h === 'buscar') {
+                document.getElementById('vista-buscar').style.display = 'block';
+                document.getElementById('nav-bus').classList.add('active');
+            } else if (h.startsWith('temp')) {
+                const n = h.replace('temp', '');
+                document.getElementById('vista-caps').style.display = 'block';
+                document.getElementById('selector-temp').value = n;
+                cargarCaps(n);
+                document.getElementById('nav-epi').classList.add('active');
+            } else if (h.startsWith('repro')) {
+                document.getElementById('vista-reproductor').style.display = 'block';
+                document.getElementById('nav-bar').style.display = 'none';
+                // Forzar pantalla completa en móvil
+                const el = document.getElementById('vista-reproductor');
+                el.style.width = '100vw';
+                el.style.height = (window.innerHeight) + 'px';
+            }
+
+            if (!h.startsWith('repro')) video.pause();
+        };
+
+        /* ===================== */
+        /* LISTA DE EPISODIOS    */
+        /* ===================== */
+        function cargarCaps(n) {
+            const box = document.getElementById('caps');
+            box.innerHTML = '';
+            for (let i = 1; i <= db[n]; i++) {
+                if (n == 5 && i == 55) continue;
+                box.appendChild(crearBoton(n, i));
+            }
+            window.scrollTo(0,0);
+        }
+
+        function crearBoton(n, i) {
+            const tF = n.toString().padStart(2, '0');
+            const cF = (n == 3) ? i.toString().padStart(3, '0') : i.toString().padStart(2, '0');
+            const url = `https://archive.org/download/LRDG-21/Fondos/La%20Rosa%20de%20Guadalupe%20S${tF}E${cF}.png`;
+            const b = document.createElement('button');
+            b.className = 'btn-cap';
+            b.innerHTML = `
+                <img src="${url}" class="miniatura" loading="lazy" onerror="this.src='https://via.placeholder.com/300x169/1e1e1e/fff?text=Cargando...'">
+                <div class="cap-info-box">
+                    <p class="cap-text">Temporada ${n} - Episodio ${i}</p>
+                </div>`;
+            b.onclick = () => reproducir(n, i, tF, cF);
+            return b;
+        }
+
+        /* ===================== */
+        /* REPRODUCTOR           */
+        /* ===================== */
+        function reproducir(n, i, tF, cF) {
+            location.hash = `repro-t${n}-c${i}`;
+            const src = `https://archive.org/download/LRDG-21/Temporada%201/La%20Rosa%20de%20Guadalupe%20S${tF}E${cF}.mp4`;
+            video.src = src;
+            video.load();
+            video.play();
+            document.getElementById('player-nombre').textContent = 'La Rosa de Guadalupe';
+            document.getElementById('player-episodio').textContent = `T${n} - EP${i}`;
+            document.getElementById('icono-play').innerHTML = '<path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/>';
+            autoHideOverlay();
+        }
+
+        function cerrarReproductor(e) {
+            e.stopPropagation();
+            video.pause();
+            window.history.back();
+        }
+
+        /* Toggle overlay con toque — responde a touch Y click */
+        const wrapper = document.getElementById('video-wrapper');
+        let tappedOnControl = false;
+
+        wrapper.addEventListener('touchend', e => {
+            // Si el toque fue en un botón de control, no toggleamos el overlay
+            if (e.target.closest('.ctrl-btn') || e.target.closest('.progress-track') || e.target.closest('.player-title-left')) return;
+            e.preventDefault();
+            toggleOverlay();
+        }, { passive: false });
+
+        // Fallback para desktop
+        wrapper.addEventListener('click', e => {
+            if (e.target.closest('.ctrl-btn') || e.target.closest('.progress-track') || e.target.closest('.player-title-left')) return;
+            toggleOverlay();
+        });
+
+        function toggleOverlay() {
+            const ov = document.getElementById('overlay-controles');
+            if (ov.classList.contains('oculto')) {
+                ov.classList.remove('oculto');
+                autoHideOverlay();
+            } else {
+                ov.classList.add('oculto');
+                clearTimeout(overlayTimeout);
+            }
+        }
+
+        function autoHideOverlay() {
+            clearTimeout(overlayTimeout);
+            overlayTimeout = setTimeout(() => {
+                document.getElementById('overlay-controles').classList.add('oculto');
+            }, 4000);
+        }
+
+        /* Play / Pause */
+        function togglePlay(e) {
+            e.stopPropagation();
+            const ico = document.getElementById('icono-play');
+            if (video.paused) {
+                video.play();
+                ico.innerHTML = '<path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/>';
+            } else {
+                video.pause();
+                ico.innerHTML = '<path d="M8 5v14l11-7z"/>';
+            }
+            autoHideOverlay();
+        }
+
+        /* Saltar segundos */
+        function skipVideo(secs, e) {
+            e.stopPropagation();
+            video.currentTime = Math.max(0, video.currentTime + secs);
+            autoHideOverlay();
+        }
+
+        /* Mute */
+        function toggleMute(e) {
+            e.stopPropagation();
+            video.muted = !video.muted;
+            const ico = document.getElementById('icono-vol');
+            ico.innerHTML = video.muted
+                ? '<path d="M16.5 12c0-1.77-1.02-3.29-2.5-4.03v2.21l2.45 2.45c.03-.2.05-.41.05-.63zm2.5 0c0 .94-.2 1.82-.54 2.64l1.51 1.51C20.63 14.91 21 13.5 21 12c0-4.28-2.99-7.86-7-8.77v2.06c2.89.86 5 3.54 5 6.71zM4.27 3L3 4.27 7.73 9H3v6h4l5 5v-6.73l4.25 4.25c-.67.52-1.42.93-2.25 1.18v2.06c1.38-.31 2.63-.95 3.69-1.81L19.73 21 21 19.73l-9-9L4.27 3zM12 4L9.91 6.09 12 8.18V4z"/>'
+                : '<path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"/>';
+            autoHideOverlay();
+        }
+
+        /* Picture-in-Picture */
+        function togglePiP(e) {
+            e.stopPropagation();
+            if (document.pictureInPictureElement) {
+                document.exitPictureInPicture();
+            } else if (video.requestPictureInPicture) {
+                video.requestPictureInPicture();
+            }
+            autoHideOverlay();
+        }
+
+        /* Pantalla completa */
+        function toggleFullscreen(e) {
+            e.stopPropagation();
+            const el = document.getElementById('vista-reproductor');
+            const ico = document.getElementById('icono-fs');
+            if (!document.fullscreenElement) {
+                el.requestFullscreen && el.requestFullscreen();
+                ico.innerHTML = '<path d="M5 16h3v3h2v-5H5v2zm3-8H5v2h5V5H8v3zm6 11h2v-3h3v-2h-5v5zm2-11V5h-2v5h5V8h-3z"/>';
+            } else {
+                document.exitFullscreen && document.exitFullscreen();
+                ico.innerHTML = '<path d="M7 14H5v5h5v-2H7v-3zm-2-4h2V7h3V5H5v5zm12 7h-3v2h5v-5h-2v3zM14 5v2h3v3h2V5h-5z"/>';
+            }
+            autoHideOverlay();
+        }
+
+        /* Progreso */
+        video.addEventListener('timeupdate', () => {
+            if (!video.duration) return;
+            const pct = (video.currentTime / video.duration) * 100;
+            document.getElementById('progress-fill').style.width = pct + '%';
+            document.getElementById('progress-thumb').style.left = pct + '%';
+            document.getElementById('tiempo-actual').textContent = formatTime(video.currentTime);
+        });
+
+        video.addEventListener('loadedmetadata', () => {
+            document.getElementById('tiempo-total').textContent = formatTime(video.duration);
+        });
+
+        video.addEventListener('ended', () => {
+            document.getElementById('icono-play').innerHTML = '<path d="M8 5v14l11-7z"/>';
+            document.getElementById('overlay-controles').classList.remove('oculto');
+        });
+
+        /* ── Barra de progreso deslizable (touch + mouse) ── */
+        const track = document.getElementById('progress-track');
+        let arrastrando = false;
+
+        function getPct(clientX) {
+            const rect = track.getBoundingClientRect();
+            return Math.min(1, Math.max(0, (clientX - rect.left) / rect.width));
+        }
+
+        function aplicarSeek(pct) {
+            if (!video.duration) return;
+            video.currentTime = pct * video.duration;
+            document.getElementById('progress-fill').style.width = (pct * 100) + '%';
+            document.getElementById('progress-thumb').style.left = (pct * 100) + '%';
+            document.getElementById('tiempo-actual').textContent = formatTime(video.currentTime);
+        }
+
+        // ── TOUCH ──
+        track.addEventListener('touchstart', e => {
+            e.stopPropagation();
+            arrastrando = true;
+            document.getElementById('progress-fill').style.transition = 'none';
+            document.getElementById('progress-thumb').style.transition = 'none';
+            aplicarSeek(getPct(e.touches[0].clientX));
+            autoHideOverlay();
+        }, { passive: true });
+
+        track.addEventListener('touchmove', e => {
+            if (!arrastrando) return;
+            e.stopPropagation();
+            aplicarSeek(getPct(e.touches[0].clientX));
+        }, { passive: true });
+
+        track.addEventListener('touchend', e => {
+            if (!arrastrando) return;
+            arrastrando = false;
+            document.getElementById('progress-fill').style.transition = 'width 0.3s linear';
+            document.getElementById('progress-thumb').style.transition = 'left 0.3s linear';
+            autoHideOverlay();
+        });
+
+        track.addEventListener('mousedown', e => {
+            e.stopPropagation();
+            arrastrando = true;
+            document.getElementById('progress-fill').style.transition = 'none';
+            document.getElementById('progress-thumb').style.transition = 'none';
+            aplicarSeek(getPct(e.clientX));
+        });
+
+        document.addEventListener('mousemove', e => {
+            if (!arrastrando) return;
+            aplicarSeek(getPct(e.clientX));
+        });
+
+        document.addEventListener('mouseup', () => {
+            if (!arrastrando) return;
+            arrastrando = false;
+            document.getElementById('progress-fill').style.transition = 'width 0.3s linear';
+            document.getElementById('progress-thumb').style.transition = 'left 0.3s linear';
+        });
+
+        function seekVideo(e) {
+            // Mantener por compatibilidad, ya no se usa directamente
+            e.stopPropagation();
+        }
+
+        function formatTime(s) {
+            if (isNaN(s)) return '00:00:00';
+            const h = Math.floor(s / 3600);
+            const m = Math.floor((s % 3600) / 60);
+            const sec = Math.floor(s % 60);
+            return `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}:${String(sec).padStart(2,'0')}`;
+        }
+
+        /* Búsqueda */
+        function buscarGlobal(input) {
+            const txt = input.value.toLowerCase();
+            const res = document.getElementById('resultados-busqueda');
+            res.innerHTML = '';
+            if (!txt) return;
+            for (let n in db) {
+                for (let i = 1; i <= db[n]; i++) {
+                    if (`temporada ${n} episodio ${i}`.includes(txt) || `${i}`.includes(txt)) {
+                        res.appendChild(crearBoton(n, i));
+                    }
+                }
+            }
+        }
+
+        window.onload = () => { if(!location.hash) navegar('bienvenida'); else window.onhashchange(); };
+
+        // ── Bloquear menú del navegador dentro del reproductor ──
+        const reproEl = document.getElementById('vista-reproductor');
+
+        // Bloquea clic derecho / menú contextual
+        reproEl.addEventListener('contextmenu', e => e.preventDefault());
+
+        // Solo bloquea el menú largo si se mantiene más de 400ms (long press)
+        // Un toque rápido NO se bloquea → toggleOverlay funciona normal
+        let longPressTimer = null;
+        reproEl.addEventListener('touchstart', e => {
+            longPressTimer = setTimeout(() => {
+                // Si es long press en botón o video, bloquamos
+                if (e.target.closest('.ctrl-btn') || e.target === video) {
+                    e.preventDefault();
+                }
+            }, 400);
+        }, { passive: true }); // passive:true = no bloquea toques normales
+
+        reproEl.addEventListener('touchend', () => clearTimeout(longPressTimer));
+        reproEl.addEventListener('touchmove', () => clearTimeout(longPressTimer));
+
+        // Evitar que el navegador "arrastre" elementos del reproductor
+        reproEl.addEventListener('dragstart', e => e.preventDefault());
+
+        // Reajustar al rotar pantalla o cambiar tamaño
+        window.addEventListener('resize', () => {
+            const el = document.getElementById('vista-reproductor');
+            if (el.style.display === 'block') {
+                el.style.height = window.innerHeight + 'px';
+            }
+        });
+    </script>
+</body>
+</html>
